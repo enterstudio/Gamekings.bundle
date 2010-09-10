@@ -1,4 +1,3 @@
-from PMS import *
 import re
 from base64 import b64decode
 
@@ -10,8 +9,6 @@ PLUGIN_PREFIX                   = '/video/gamekings'
 BASE_URL                        = 'http://www.gamekings.tv'
 VIDEO_CATEGORIES                = '%s/index/category/videos/' % BASE_URL
 VIDEOS                          = '%s/wp-content/themes/default/filter-latest.php?Acat=%%s&page=%%s' % BASE_URL
-
-CACHE_INTERVAL                  = 1800
 
 # Default artwork and icon(s)
 PLUGIN_ARTWORK                  = 'art-default.png'
@@ -30,7 +27,8 @@ def Start():
   MediaContainer.art            = R(PLUGIN_ARTWORK)
 
   # Set the default cache time
-  HTTP.SetCacheTime(CACHE_INTERVAL)
+  HTTP.CacheTime = 1800
+  HTTP.Headers['User-agent'] = 'Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10.6; en-US; rv:1.9.2.4) Gecko/20100611 Firefox/3.6.4'
 
 ####################################################################################################
 
@@ -41,7 +39,7 @@ def MainMenu():
   dir.Append(Function(DirectoryItem(Playlist, title='Alle video\'s', thumb=R(PLUGIN_ICON_DEFAULT)), id=3, title='Alle video\'s'))
 
   # All top level menu items
-  list = XML.ElementFromURL(VIDEO_CATEGORIES, isHTML=True, errors='ignore').xpath('//select[@id="cat"]/option[@class="level-0"]')
+  list = HTML.ElementFromURL(VIDEO_CATEGORIES, errors='ignore').xpath('//select[@id="cat"]/option[@class="level-0"]')
 
   for menuitem in list:
     id    = menuitem.get('value')
@@ -82,7 +80,7 @@ def Sub(sender, title, sub):
 def Playlist(sender, id, title, page=1):
   dir = MediaContainer(viewGroup='Details', title2=title)
 
-  content = XML.ElementFromURL(VIDEOS % (id, page), isHTML=True, errors='ignore')
+  content = HTML.ElementFromURL(VIDEOS % (id, page), errors='ignore')
   vids = content.xpath('//a[@class="filterlist"]')
 
   for video in vids:
@@ -114,7 +112,7 @@ def Playlist(sender, id, title, page=1):
 ####################################################################################################
 
 def PlayVideo(sender, link):
-  playerHtml = HTTP.Request(link, errors='ignore')
+  playerHtml = HTTP.Request(link, errors='ignore').content
 
   # Find the id of the video
   videoId = re.search('playlist2\.php\?id=(.+)\'\)', playerHtml).group(1)
