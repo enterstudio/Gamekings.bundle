@@ -1,45 +1,37 @@
 import re
-from base64 import b64decode
+
+TITLE    = 'Gamekings'
+BASE_URL = 'http://www.gamekings.tv'
+VIDEO    = '%s/videos' % BASE_URL
+CATEGORY = '%s/category/%%s/page/%%d' % BASE_URL
+PLAYLIST = '%s/wp-content/themes/gk2010/playlist2.php?id=%%s' % BASE_URL
+XSPF_NS  = {'xspf':'http://xspf.org/ns/0/'}
+ART      = 'art-default.jpg'
+ICON     = 'icon-default.png'
 
 ####################################################################################################
-
-PLUGIN_TITLE                    = 'Gamekings'
-PLUGIN_PREFIX                   = '/video/gamekings'
-
-BASE_URL                        = 'http://www.gamekings.tv'
-VIDEO_CATEGORIES                = '%s/index/category/videos/' % BASE_URL
-VIDEOS                          = '%s/wp-content/themes/default/filter-latest.php?Acat=%%s&page=%%s' % BASE_URL
-
-# Default artwork and icon(s)
-PLUGIN_ARTWORK                  = 'art-default.png'
-PLUGIN_ICON_DEFAULT             = 'icon-default.png'
-
-####################################################################################################
-
 def Start():
-  Plugin.AddPrefixHandler(PLUGIN_PREFIX, MainMenu, PLUGIN_TITLE)
+  Plugin.AddPrefixHandler('/video/gamekings', MainMenu, TITLE, ICON, ART)
   Plugin.AddViewGroup('List', viewMode='List', mediaType='items')
-  Plugin.AddViewGroup('Details', viewMode='InfoList', mediaType='items')
+  Plugin.AddViewGroup('InfoList', viewMode='InfoList', mediaType='items')
 
-  # Set the default MediaContainer attributes
-  MediaContainer.title1         = PLUGIN_TITLE
-  MediaContainer.viewGroup      = 'List'
-  MediaContainer.art            = R(PLUGIN_ARTWORK)
+  MediaContainer.art       = R(ART)
+  MediaContainer.title1    = TITLE
+  MediaContainer.viewGroup = 'List'
+  DirectoryItem.thumb      = R(ICON)
 
-  # Set the default cache time
-  HTTP.CacheTime = 1800
-  HTTP.Headers['User-agent'] = 'Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10.6; en-US; rv:1.9.2.4) Gecko/20100611 Firefox/3.6.4'
+  HTTP.CacheTime = CACHE_1HOUR
+  HTTP.Headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10.6; en-US; rv:1.9.2.16) Gecko/20110319 Firefox/3.6.16'
 
 ####################################################################################################
-
 def MainMenu():
   dir = MediaContainer()
 
   # The first list option is different from the rest (it misses the "class" attribute and has a wrong videoId (-1, while the real videoId for "All videos" is 3)
-  dir.Append(Function(DirectoryItem(Playlist, title='Alle video\'s', thumb=R(PLUGIN_ICON_DEFAULT)), id=3, title='Alle video\'s'))
+  dir.Append(Function(DirectoryItem(Playlist, title='Alle video\'s', thumb=R(ICON)), id='videos', title='Alle video\'s'))
 
   # All top level menu items
-  list = HTML.ElementFromURL(VIDEO_CATEGORIES, errors='ignore').xpath('//select[@id="cat"]/option[@class="level-0"]')
+  list = HTML.ElementFromURL(VIDEO, errors='ignore').xpath('//select[@id="cat"]/option[@class="level-0"]')
 
   for menuitem in list:
     id    = menuitem.get('value')
@@ -47,7 +39,7 @@ def MainMenu():
 
     # Check to see if an item has 'sub'-items (siblings with class="level-1")
     if len(menuitem.xpath('./following-sibling::*')) == 0 or menuitem.xpath('./following-sibling::*')[0].get('class') == 'level-0':
-      dir.Append(Function(DirectoryItem(Playlist, title=title, thumb=R(PLUGIN_ICON_DEFAULT)), id=id, title=title))
+      dir.Append(Function(DirectoryItem(Playlist, title=title, thumb=R(ICON)), id=id, title=title))
     else:
       siblings = menuitem.xpath('./following-sibling::*')
       sub = []
@@ -61,62 +53,68 @@ def MainMenu():
         else:
           sub.append([sibid, sibtitle])
 
-      dir.Append(Function(DirectoryItem(Sub, title=title, thumb=R(PLUGIN_ICON_DEFAULT)), title=title, sub=sub))
+      dir.Append(Function(DirectoryItem(Subcategory, title=title, thumb=R(ICON)), sub=sub))
 
   return dir
 
 ####################################################################################################
+def Subcategory(sender, sub):
+  dir = MediaContainer(title2=sender.itemTitle)
 
-def Sub(sender, title, sub):
-  dir = MediaContainer(title2=title)
-
-  for item in sub:
-    dir.Append(Function(DirectoryItem(Playlist, title=item[1], thumb=R(PLUGIN_ICON_DEFAULT)), id=item[0], title=item[1]))
+  for (id, title) in sub:
+    dir.Append(Function(DirectoryItem(Playlist, title=title, thumb=R(ICON)), id=id, title=title))
 
   return dir
 
 ####################################################################################################
-
 def Playlist(sender, id, title, page=1):
-  dir = MediaContainer(viewGroup='Details', title2=title)
+  dir = MediaContainer(viewGroup='InfoList', title2=title)
+  content = HTML.ElementFromURL(CATEGORY % (id, page), errors='ignore')
 
-  content = HTML.ElementFromURL(VIDEOS % (id, page), errors='ignore')
-  vids = content.xpath('//a[@class="filterlist"]')
+  for video in content.xpath('//section[@id="archiefoverzicht"]/article/a'):
+    url = video.get('href')
+    title = video.xpath('./h2')[0].text_content().strip()
+    date = video.xpath('./p[@class="col"]')[0].text.split(' ', 1)[0]
+    summary = video.xpath('./p[2]')[0].text
 
-  for video in vids:
-    link        = video.get('href')
-    title       = video.xpath('./b/text()')[0].strip()
-
-    # Change date notation to 'day-month-year' (Dutch)
-    date        = video.xpath('./small[not(@class="excerpt")]/text()')[0].strip().split(' | ')[0].split('-')
-    date        = date[1] + '-' + date[0] + '-' + date[2]
-
-    description = ' '.join( video.xpath('./small[@class="excerpt"]/*/text()') ).strip()
-    thumb       = video.xpath('./img[@class="reviewpic"]')[0].get('src').replace(' ', '%20')
-
-    dir.Append(Function(VideoItem(PlayVideo, title=title, subtitle=date, summary=description, thumb=BASE_URL + thumb), link=link))
+    dir.Append(Function(VideoItem(PlayVideo, title=title, subtitle=date, summary=summary, thumb=Function(GetEpisodeThumb, url=url)), url=url))
 
   # Pagination
-  # Past all text nodes from witihn the DIV 'Ajax-pager' together...
-  pages = ' '.join( content.xpath('//div[@id="Ajax-pager"]/text()') ).strip()
+  try:
+    # Find out how many pages there are in total
+    total_pages = re.search('Pagina (\\d+) van (\\d+)', content.xpath('//ul[@id="paginate"]')[0].text_content()).group(2)
 
-  # ...and find out how many pages there are in total
-  totalPages = re.search(' van (\\d+)', pages).group(1)
-
-  # Add a 'More...' element if there is more than one page with videos
-  if page < int(totalPages):
-    dir.Append(Function(DirectoryItem(Playlist, title='Meer...', thumb=R(PLUGIN_ICON_DEFAULT)), id=id, title=title, page=page+1))
+    # Add a 'More...' element if there is more than one page with videos
+    if page < int(total_pages):
+      dir.Append(Function(DirectoryItem(Playlist, title='Meer...', thumb=R(ICON)), id=id, title=title, page=page+1))
+  except:
+    pass
 
   return dir
 
 ####################################################################################################
-
-def PlayVideo(sender, link):
-  playerHtml = HTTP.Request(link, errors='ignore').content
-
-  # Find the id of the video
-  videoId = re.search('playlist2\.php\?id=(.+)\'\)', playerHtml).group(1)
-  video   = b64decode( videoId ).split(',')
-  url     = (video[2] + video[0]).replace(' ', '%20')
-
+def PlayVideo(sender, url):
+  video_page = HTTP.Request(url, cacheTime=CACHE_1WEEK).content
+  x = re.search("showVideo\('([^']+)','([^']+)'", video_page)
+  playlist = XML.ElementFromURL(PLAYLIST % x.group(2))
+  url = playlist.xpath('//xspf:track/xspf:identifier[text()="' + x.group(1) + '"]/../xspf:location', namespaces=XSPF_NS)[0].text
   return Redirect(url)
+
+####################################################################################################
+def GetThumb(url):
+  if url is not None:
+    try:
+      data = HTTP.Request(url.replace(' ', '%20'), cacheTime=CACHE_1MONTH).content
+      return DataObject(data, 'image/jpeg')
+    except:
+      pass
+  return Redirect(R(ICON))
+
+####################################################################################################
+def GetEpisodeThumb(url):
+  try:
+    video_page = HTML.ElementFromURL(url, cacheTime=CACHE_1WEEK)
+    thumb = video_page.xpath('//img[@id="videocover"]')[0].get('src')
+  except:
+    thumb = None
+  return GetThumb(thumb)
