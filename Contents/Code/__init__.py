@@ -1,83 +1,97 @@
 import re
 
-TITLE    = 'Gamekings'
+NAME = 'Gamekings'
 BASE_URL = 'http://www.gamekings.tv'
-VIDEO    = '%s/videos' % BASE_URL
+VIDEO = '%s/videos' % BASE_URL
 CATEGORY = '%s/category/%%s/page/%%d' % BASE_URL
-PLAYLIST = '%s/wp-content/themes/gk2010/playlist2.php?id=%%s' % BASE_URL
-XSPF_NS  = {'xspf':'http://xspf.org/ns/0/'}
-ART      = 'art-default.jpg'
-ICON     = 'icon-default.png'
+ART = 'art-default.jpg'
+ICON = 'icon-default.png'
 
 ####################################################################################################
 def Start():
-  Plugin.AddPrefixHandler('/video/gamekings', MainMenu, TITLE, ICON, ART)
+  Plugin.AddPrefixHandler('/video/gamekings', MainMenu, NAME, ICON, ART)
   Plugin.AddViewGroup('List', viewMode='List', mediaType='items')
   Plugin.AddViewGroup('InfoList', viewMode='InfoList', mediaType='items')
 
-  MediaContainer.art       = R(ART)
-  MediaContainer.title1    = TITLE
-  MediaContainer.viewGroup = 'List'
-  DirectoryItem.thumb      = R(ICON)
+  ObjectContainer.art = R(ART)
+  ObjectContainer.title1 = NAME
+  ObjectContainer.view_group = 'List'
+  DirectoryObject.thumb = R(ICON)
 
   HTTP.CacheTime = CACHE_1HOUR
-  HTTP.Headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10.6; en-US; rv:1.9.2.16) Gecko/20110319 Firefox/3.6.16'
+  HTTP.Headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.7; rv:9.0.1) Gecko/20100101 Firefox/9.0.1'
 
 ####################################################################################################
 def MainMenu():
-  dir = MediaContainer()
+  oc = ObjectContainer()
 
-  # The first list option is different from the rest (it misses the "class" attribute and has a wrong videoId (-1, while the real videoId for "All videos" is 3)
-  dir.Append(Function(DirectoryItem(Playlist, title='Alle video\'s', thumb=R(ICON)), id='videos', title='Alle video\'s'))
+  # The first list option is different from the rest (it's missing the "class" attribute)
+  oc.add(DirectoryObject(key=Callback(Playlist, id='videos', category_title='Alle video\'s'), title='Alle video\'s'))
 
   # All top level menu items
-  list = HTML.ElementFromURL(VIDEO, errors='ignore').xpath('//select[@id="cat"]/option[@class="level-0"]')
+  list = HTML.ElementFromURL(VIDEO).xpath('//select[@id="cat"]/option[@class="level-0"]')
 
-  for menuitem in list:
-    id    = menuitem.get('value')
-    title = menuitem.xpath('./text()')[0].strip()
+  for item in list:
+    id    = item.get('value')
+    title = item.xpath('./text()')[0].strip()
 
     # Check to see if an item has 'sub'-items (siblings with class="level-1")
-    if len(menuitem.xpath('./following-sibling::*')) == 0 or menuitem.xpath('./following-sibling::*')[0].get('class') == 'level-0':
-      dir.Append(Function(DirectoryItem(Playlist, title=title, thumb=R(ICON)), id=id, title=title))
+    if len(item.xpath('./following-sibling::*')) == 0 or item.xpath('./following-sibling::*')[0].get('class') == 'level-0':
+      oc.add(DirectoryObject(key=Callback(Playlist, id=id, category_title=title), title=title))
     else:
-      siblings = menuitem.xpath('./following-sibling::*')
+      siblings = item.xpath('./following-sibling::*')
       sub = []
-      for sib in siblings:
-        sibid    = sib.get('value')
-        sibtitle = sib.xpath('./text()')[0].strip()
-        siblevel = sib.get('class')
 
-        if siblevel == 'level-0':
+      for s in siblings:
+        sib_id    = s.get('value')
+        sib_title = s.xpath('./text()')[0].strip()
+        sib_level = s.get('class')
+
+        if sib_level == 'level-0':
           break;
         else:
-          sub.append([sibid, sibtitle])
+          sub.append([sib_id, sib_title])
 
-      dir.Append(Function(DirectoryItem(Subcategory, title=title, thumb=R(ICON)), sub=sub))
+      oc.add(DirectoryObject(key=Callback(Subcategory, sub=sub, category_title=title), title=title))
 
-  return dir
+  return oc
 
 ####################################################################################################
-def Subcategory(sender, sub):
-  dir = MediaContainer(title2=sender.itemTitle)
+def Subcategory(sub, category_title):
+  oc = ObjectContainer(title2=category_title)
 
   for (id, title) in sub:
-    dir.Append(Function(DirectoryItem(Playlist, title=title, thumb=R(ICON)), id=id, title=title))
+    oc.add(DirectoryObject(key=Callback(Playlist, id=id, category_title=title), title=title))
 
-  return dir
+  return oc
 
 ####################################################################################################
-def Playlist(sender, id, title, page=1):
-  dir = MediaContainer(viewGroup='InfoList', title2=title)
-  content = HTML.ElementFromURL(CATEGORY % (id, page), errors='ignore')
+def Playlist(id, category_title, page=1):
+  oc = ObjectContainer(view_group='InfoList', title2=category_title)
+  content = HTML.ElementFromURL(CATEGORY % (id, page))
 
   for video in content.xpath('//section[@id="archiefoverzicht"]/article/a'):
     url = video.get('href')
-    title = video.xpath('./h2')[0].text_content().strip()
-    date = video.xpath('./p[@class="col"]')[0].text.split(' ', 1)[0]
-    summary = video.xpath('./p[2]')[0].text
 
-    dir.Append(Function(VideoItem(PlayVideo, title=title, subtitle=date, summary=summary, thumb=Function(GetEpisodeThumb, url=url)), url=url))
+    if '/videos/' not in url:
+      continue
+
+    try:
+      title = video.xpath('./h2/text()')[0].strip()
+    except:
+      title = video.xpath('./h2')[0].text_content().strip()
+
+    summary = video.xpath('./p[2]')[0].text
+    date = video.xpath('./p[@class="col"]')[0].text.split(' ', 1)[0]
+    date = Datetime.ParseDate(date).date()
+
+    oc.add(VideoClipObject(
+      url = url,
+      title = title,
+      summary = summary,
+      originally_available_at = date,
+      thumb = Callback(GetEpisodeThumb, url=url)
+    ))
 
   # Pagination
   try:
@@ -86,35 +100,30 @@ def Playlist(sender, id, title, page=1):
 
     # Add a 'More...' element if there is more than one page with videos
     if page < int(total_pages):
-      dir.Append(Function(DirectoryItem(Playlist, title='Meer...', thumb=R(ICON)), id=id, title=title, page=page+1))
+      oc.add(DirectoryObject(key=Callback(Playlist, id=id, category_title=category_title, page=page+1), title='Meer...'))
   except:
     pass
 
-  return dir
-
-####################################################################################################
-def PlayVideo(sender, url):
-  video_page = HTTP.Request(url, cacheTime=CACHE_1WEEK).content
-  x = re.search("showVideo\('([^']+)','([^']+)'", video_page)
-  playlist = XML.ElementFromURL(PLAYLIST % x.group(2))
-  url = playlist.xpath('//xspf:track/xspf:identifier[text()="' + x.group(1) + '"]/../xspf:location', namespaces=XSPF_NS)[0].text
-  return Redirect(url)
+  return oc
 
 ####################################################################################################
 def GetThumb(url):
-  if url is not None:
+  if url:
     try:
       data = HTTP.Request(url.replace(' ', '%20'), cacheTime=CACHE_1MONTH).content
       return DataObject(data, 'image/jpeg')
     except:
       pass
+
   return Redirect(R(ICON))
 
 ####################################################################################################
 def GetEpisodeThumb(url):
-  try:
-    video_page = HTML.ElementFromURL(url, cacheTime=CACHE_1WEEK)
-    thumb = video_page.xpath('//img[@id="videocover"]')[0].get('src')
-  except:
+  thumb = HTML.ElementFromURL(url, cacheTime=CACHE_1MONTH).xpath('//img[@id="videocover"]')
+
+  if thumb:
+    thumb = thumb[0].get('src')
+  else:
     thumb = None
+
   return GetThumb(thumb)
