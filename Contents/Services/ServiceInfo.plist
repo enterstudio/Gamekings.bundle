@@ -2,11 +2,15 @@
 <!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CFBundleIdentifier</key>
-	<string>com.plexapp.plugins.gamekings</string>
-	<key>PlexClientPlatforms</key>
-	<string>*</string>
-	<key>PlexFrameworkVersion</key>
-	<string>2</string>
+	<key>URL</key>
+	<dict>
+		<key>Gamekings</key>
+		<dict>
+			<key>URLPatterns</key>
+			<array>
+				<string>^http://www.gamekings.tv/videos/.+</string>
+			</array>
+		</dict>
+	</dict>
 </dict>
 </plist>

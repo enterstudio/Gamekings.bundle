@@ -1,0 +1,69 @@
+PLAYLIST = 'http://www.gamekings.tv/wp-content/themes/gk2010/playlist2.php?id=%s'
+XSPF_NS = {'xspf':'http://xspf.org/ns/0/'}
+
+RE_DATE = Regex('(.+?,\s[0-9]{4})')
+RE_ID = Regex("showVideo\('([^']+)','([^']+)'")
+RE_AMPERSAND = Regex('&(?!amp;)')
+
+####################################################################################################
+def TestURLs():
+
+  test_urls = []
+
+  for url in HTML.ElementFromURL('http://www.gamekings.tv/videos').xpath('//section[@id="archiefoverzicht"]/article[position() < 4]/a/@href'):
+    test_urls.append(url)
+
+  return test_urls
+
+####################################################################################################
+def MetadataObjectForURL(url):
+
+  page = HTML.ElementFromURL(url)
+
+  title = page.xpath('//section[@id="MainContent"]//h1/text()')[0]
+  summary = '\n\n'.join( page.xpath('//section[@id="MainContent"]//small/following-sibling::p[not(@class)]/text()') )
+  thumb = page.xpath('//img[@id="videocover"]/@src')[0]
+
+  try:
+    date = page.xpath('//section[@id="MainContent"]//small/text()')[0]
+    date = RE_DATE.search(date).group(1)
+    originally_available_at = Datetime.ParseDate(date).date()
+  except:
+    originally_available_at = None
+
+  return VideoClipObject(
+    title = title,
+    summary = summary,
+    originally_available_at = originally_available_at,
+    thumb = Resource.ContentsOfURLWithFallback(url=thumb)
+  )
+
+####################################################################################################
+def MediaObjectsForURL(url):
+
+  return [
+    MediaObject(
+      video_codec = VideoCodec.H264,
+      audio_codec = AudioCodec.AAC,
+      container = Container.MP4,
+      video_resolution = 'sd',
+      audio_channels = 2,
+      optimized_for_streaming = True,
+      bitrate = 1600,
+      parts = [PartObject(key=Callback(PlayVideo, url=url))]
+    )
+  ]
+
+####################################################################################################
+@indirect
+def PlayVideo(url):
+
+  page = HTTP.Request(url).content
+  id = RE_ID.search(page)
+
+  playlist = HTTP.Request(PLAYLIST % id.group(2)).content
+  playlist = RE_AMPERSAND.sub('&amp;', playlist)
+  playlist = XML.ElementFromString(playlist)
+
+  url = playlist.xpath('//xspf:track/xspf:identifier[text()="' + id.group(1) + '"]/../xspf:location', namespaces=XSPF_NS)[0].text
+  return IndirectResponse(VideoClipObject, key=url)
