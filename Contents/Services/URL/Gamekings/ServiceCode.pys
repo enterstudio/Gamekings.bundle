@@ -2,7 +2,7 @@ PLAYLIST = 'http://www.gamekings.tv/wp-content/themes/gk2010/playlist2.php?id=%s
 XSPF_NS = {'xspf':'http://xspf.org/ns/0/'}
 
 RE_DATE = Regex('(.+?,\s[0-9]{4})')
-RE_ID = Regex("showVideo\('([^']+)','([^']+)'")
+RE_ID = Regex("storeVideo\('([^']+)','([^']+)'")
 RE_AMPERSAND = Regex('&(?!amp;)')
 
 ####################################################################################################
