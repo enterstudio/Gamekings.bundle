@@ -10,7 +10,7 @@ def Start():
 
   ObjectContainer.title1 = NAME
   HTTP.CacheTime = CACHE_1HOUR
-  HTTP.Headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.8; rv:22.0) Gecko/20100101 Firefox/22.0'
+  HTTP.Headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.114 Safari/537.36'
 
 ####################################################################################################
 @handler('/video/gamekings', NAME)
@@ -59,7 +59,7 @@ def MainMenu():
   return oc
 
 ####################################################################################################
-@route('/video/gamekings/category')
+@route('/video/gamekings/category', sub=list)
 def Subcategory(sub, category_title):
 
   oc = ObjectContainer(title2=category_title)
@@ -93,13 +93,17 @@ def Playlist(id, category_title, page=1):
     summary = video.xpath('./p[2]')[0].text
     date = video.xpath('./p[@class="col"]')[0].text.split(' ', 1)[0]
     date = Datetime.ParseDate(date).date()
+    thumb = video.xpath('./img/@src')[0].replace(' ', '%20')
+
+    if '-75x75' in thumb:
+      thumb = '%s.jpg' % thumb.rsplit('-75x75')[0]
 
     oc.add(VideoClipObject(
       url = url,
       title = title,
       summary = summary,
       originally_available_at = date,
-      thumb = Callback(GetEpisodeThumb, url=url)
+      thumb = Resource.ContentsOfURLWithFallback(thumb)
     ))
 
   # Pagination
@@ -117,29 +121,3 @@ def Playlist(id, category_title, page=1):
     pass
 
   return oc
-
-####################################################################################################
-@route('/video/gamekings/getthumb')
-def GetThumb(url):
-
-  if url:
-    try:
-      data = HTTP.Request(url.replace(' ', '%20'), cacheTime=CACHE_1MONTH, sleep=0.5).content
-      return DataObject(data, 'image/jpeg')
-    except:
-      pass
-
-  return Redirect('http://resources-cdn.plexapp.com/image/source/com.plexapp.plugins.gamekings.jpg')
-
-####################################################################################################
-@route('/video/gamekings/getepisodethumb')
-def GetEpisodeThumb(url):
-
-  thumb = HTML.ElementFromURL(url, cacheTime=CACHE_1MONTH, sleep=0.5).xpath('//img[@id="videocover"]')
-
-  if thumb:
-    thumb = thumb[0].get('src')
-  else:
-    thumb = None
-
-  return GetThumb(thumb)
