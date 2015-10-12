@@ -1,5 +1,5 @@
 NAME = 'Gamekings'
-BASE_URL = 'http://www.gamekings.tv'
+BASE_URL = 'http://www.gamekings.nl'
 VIDEO = '%s/videos' % BASE_URL
 CATEGORY = '%s/category/%%s/page/%%d' % BASE_URL
 
@@ -10,7 +10,7 @@ def Start():
 
   ObjectContainer.title1 = NAME
   HTTP.CacheTime = CACHE_1HOUR
-  HTTP.Headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.114 Safari/537.36'
+  HTTP.Headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.101 Safari/537.36'
 
 ####################################################################################################
 @handler('/video/gamekings', NAME)
