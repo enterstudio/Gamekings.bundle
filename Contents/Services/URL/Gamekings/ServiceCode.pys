@@ -1,4 +1,4 @@
-PLAYLIST = 'http://www.gamekings.tv/wp-content/themes/gk2010/rss_playlist.php?id=%s'
+PLAYLIST = 'http://www.gamekings.nl/wp-content/themes/gk2010/rss_playlist.php?id=%s'
 PLAYLIST_NS = {'jwplayer': 'http://rss.jwpcdn.com/'}
 
 RE_ID = Regex('gogoVideo\(\d+,"([^"]+)"')
@@ -8,7 +8,7 @@ def TestURLs():
 
   test_urls = []
 
-  for url in HTML.ElementFromURL('http://www.gamekings.tv/videos').xpath('//section[@id="archiefoverzicht"]/article[position() < 4]/a/@href'):
+  for url in HTML.ElementFromURL('http://www.gamekings.nl/videos').xpath('//section[@id="archiefoverzicht"]/article[position() < 4]/a/@href'):
     test_urls.append(url)
 
   return test_urls
@@ -37,11 +37,12 @@ def MediaObjectsForURL(url):
       video_codec = VideoCodec.H264,
       audio_codec = AudioCodec.AAC,
       container = Container.MP4,
-      video_resolution = 'sd',
+      video_resolution = '720',
       audio_channels = 2,
       optimized_for_streaming = True,
-      bitrate = 1600,
-      parts = [PartObject(key=Callback(PlayVideo, url=url))]
+      parts = [
+        PartObject(key=Callback(PlayVideo, url=url))
+      ]
     )
   ]
 
