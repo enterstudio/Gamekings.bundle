@@ -1,6 +1,7 @@
 PLAYLIST = 'http://www.gamekings.nl/wp-content/themes/gk2010/rss_playlist.php?id=%s'
 PLAYLIST_NS = {'jwplayer': 'http://rss.jwpcdn.com/'}
 
+RE_THUMB = Regex("image: *'([^']+)")
 RE_ID = Regex('gogoVideo\(\d+,"([^"]+)"')
 
 ####################################################################################################
@@ -8,15 +9,19 @@ def MetadataObjectForURL(url):
 
   html = HTML.ElementFromURL(url)
 
-  title = html.xpath('//meta[@property="og:title"]/@content')[0]
-  summary = html.xpath('//meta[@property="og:description"]/@content')[0]
-  thumb = html.xpath('//meta[@property="og:image"]/@content')[0]
-  thumb_large = '%s.jpg' % thumb.rsplit('-', 1)[0]
+  title = html.xpath('//title/text()')[0].rsplit(' Gamekings')[0]
+  summary = html.xpath('//meta[@name="description"]/@content')[0]
+
+  try:
+    thumb = html.xpath('//script[contains(., "jwplayer") and contains(., "image")]/text()')[0]
+    thumb = RE_THUMB.search(thumb).group(1)
+  except:
+    thumb = ''
 
   return VideoClipObject(
     title = title,
     summary = summary,
-    thumb = Resource.ContentsOfURLWithFallback([thumb_large, thumb])
+    thumb = Resource.ContentsOfURLWithFallback(thumb)
   )
 
 ####################################################################################################
