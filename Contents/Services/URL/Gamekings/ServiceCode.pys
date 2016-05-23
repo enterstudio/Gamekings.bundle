@@ -4,16 +4,6 @@ PLAYLIST_NS = {'jwplayer': 'http://rss.jwpcdn.com/'}
 RE_ID = Regex('gogoVideo\(\d+,"([^"]+)"')
 
 ####################################################################################################
-def TestURLs():
-
-  test_urls = []
-
-  for url in HTML.ElementFromURL('http://www.gamekings.nl/videos').xpath('//section[@id="archiefoverzicht"]/article[position() < 4]/a/@href'):
-    test_urls.append(url)
-
-  return test_urls
-
-####################################################################################################
 def MetadataObjectForURL(url):
 
   html = HTML.ElementFromURL(url)
