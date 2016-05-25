@@ -1,123 +1,56 @@
 NAME = 'Gamekings'
-BASE_URL = 'http://www.gamekings.nl'
-VIDEO = '%s/videos' % BASE_URL
-CATEGORY = '%s/category/%%s/page/%%d' % BASE_URL
-
-RE_NEXT_PAGE = Regex('Pagina (\\d+) van (\\d+)')
+BASE_URL = 'http://www.gamekings.nl/category/videos/'
+TAG_ID = '?tag_id='
 
 ####################################################################################################
 def Start():
 
   ObjectContainer.title1 = NAME
   HTTP.CacheTime = CACHE_1HOUR
-  HTTP.Headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.101 Safari/537.36'
+  HTTP.Headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'
 
 ####################################################################################################
 @handler('/video/gamekings', NAME)
 def MainMenu():
 
   oc = ObjectContainer()
+  html = HTML.ElementFromURL(BASE_URL)
 
-  # The first list option is different from the rest (it's missing the "class" attribute)
-  oc.add(DirectoryObject(
-    key = Callback(Playlist, id='videos', category_title='Alle video\'s'),
-    title = 'Alle video\'s'
-  ))
+  for filter in html.xpath('//ul[@class="filters__list"]/li'):
 
-  # All top level menu items
-  list = HTML.ElementFromURL(VIDEO).xpath('//select[@id="cat"]/option[@class="level-0"]')
+    id = filter.xpath('./label/input/@value')[0]
+    title = filter.xpath('./label/text()')[0].strip()
 
-  for item in list:
-    id = item.get('value')
-    title = item.xpath('./text()')[0].strip()
-
-    # Check to see if an item has 'sub'-items (siblings with class="level-1")
-    if len(item.xpath('./following-sibling::*')) == 0 or item.xpath('./following-sibling::*/@class')[0] == 'level-0':
-      oc.add(DirectoryObject(
-        key = Callback(Playlist, id=id, category_title=title),
-        title = title
-      ))
-    else:
-      siblings = item.xpath('./following-sibling::*')
-      sub = []
-
-      for s in siblings:
-        sib_id = s.get('value')
-        sib_title = s.xpath('./text()')[0].strip()
-        sib_level = s.get('class')
-
-        if sib_level == 'level-0':
-          break
-        else:
-          sub.append([sib_id, sib_title])
-
-      oc.add(DirectoryObject(
-        key = Callback(Subcategory, sub=sub, category_title=title),
-        title = title
-      ))
-
-  return oc
-
-####################################################################################################
-@route('/video/gamekings/category', sub=list)
-def Subcategory(sub, category_title):
-
-  oc = ObjectContainer(title2=category_title)
-
-  for (id, title) in sub:
     oc.add(DirectoryObject(
-      key = Callback(Playlist, id=id, category_title=title),
+      key = Callback(Filter, id=id, title=title),
       title = title
     ))
 
   return oc
 
 ####################################################################################################
-@route('/video/gamekings/playlist', page=int)
-def Playlist(id, category_title, page=1):
+@route('/video/gamekings/filter/{id}')
+def Filter(id, title):
 
-  oc = ObjectContainer(title2=category_title)
-  content = HTML.ElementFromURL(CATEGORY % (id, page))
+  oc = ObjectContainer(title2=title)
+  html = HTML.ElementFromURL('%s%s%s' % (BASE_URL, TAG_ID, id))
 
-  for video in content.xpath('//section[@id="archiefoverzicht"]/article/a'):
-    url = video.get('href')
+  for video in html.xpath('//div[@class="postcontainer"]/div[contains(@class, "post")]'):
 
-    if '/videos/' not in url:
-      continue
+    url = video.xpath('./a/@href')[0]
+    title = video.xpath('./h3[@class="post__title"]/a/text()')[0].strip()
+    summary = video.xpath('./p[@class="post__summary"]/text()')[0].strip()
+    thumb = video.xpath('./a/img/@data-original')[0]
 
-    try:
-      title = video.xpath('./h2/text()')[0].strip()
-    except:
-      title = video.xpath('./h2')[0].text_content().strip()
-
-    summary = video.xpath('./p[2]')[0].text
-    date = video.xpath('./p[@class="col"]')[0].text.split(' ', 1)[0]
+    date = video.xpath('.//span[@class="meta__item"]/text()')[0]
     date = Datetime.ParseDate(date).date()
-    thumb = video.xpath('./img/@src')[0].replace(' ', '%20')
-
-    if '-75x75' in thumb:
-      thumb = '%s.jpg' % thumb.rsplit('-75x75')[0]
 
     oc.add(VideoClipObject(
       url = url,
       title = title,
       summary = summary,
-      originally_available_at = date,
-      thumb = Resource.ContentsOfURLWithFallback(thumb)
+      thumb = Resource.ContentsOfURLWithFallback(thumb),
+      originally_available_at = date
     ))
-
-  # Pagination
-  try:
-    # Find out how many pages there are in total
-    total_pages = RE_NEXT_PAGE.search(content.xpath('//ul[@id="paginate"]')[0].text_content()).group(2)
-
-    # Add a 'More...' element if there is more than one page with videos
-    if page < int(total_pages):
-      oc.add(NextPageObject(
-        key = Callback(Playlist, id=id, category_title=category_title, page=page+1),
-        title = 'Meer...'
-      ))
-  except:
-    pass
 
   return oc
