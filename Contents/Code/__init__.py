@@ -1,6 +1,5 @@
 NAME = 'Gamekings'
-BASE_URL = 'http://www.gamekings.nl/category/videos/'
-TAG_ID = '?tag_id='
+BASE_URL = 'http://www.gamekings.nl/category/videos/page/%d/'
 
 ####################################################################################################
 def Start():
@@ -13,27 +12,14 @@ def Start():
 @handler('/video/gamekings', NAME)
 def MainMenu():
 
-  oc = ObjectContainer()
-  html = HTML.ElementFromURL(BASE_URL)
-
-  for filter in html.xpath('//ul[@class="filters__list"]/li'):
-
-    id = filter.xpath('./label/input/@value')[0]
-    title = filter.xpath('./label/text()')[0].strip()
-
-    oc.add(DirectoryObject(
-      key = Callback(Filter, id=id, title=title),
-      title = title
-    ))
-
-  return oc
+  return Videos()
 
 ####################################################################################################
-@route('/video/gamekings/filter/{id}')
-def Filter(id, title):
+@route('/video/gamekings/videos', page=int)
+def Videos(page=1):
 
-  oc = ObjectContainer(title2=title)
-  html = HTML.ElementFromURL('%s%s%s' % (BASE_URL, TAG_ID, id))
+  oc = ObjectContainer()
+  html = HTML.ElementFromURL(BASE_URL % (page))
 
   for video in html.xpath('//div[@class="postcontainer"]/div[contains(@class, "post")]'):
 
@@ -51,6 +37,13 @@ def Filter(id, title):
       summary = summary,
       thumb = Resource.ContentsOfURLWithFallback(thumb),
       originally_available_at = date
+    ))
+
+  if page < 50:
+
+    oc.add(NextPageObject(
+      key = Callback(Videos, page=page+1),
+      title = "Meer video's..."
     ))
 
   return oc
