@@ -1,4 +1,6 @@
 NAME = 'Gamekings'
+ART = 'art-default.jpg'
+ICON = 'icon-default.jpg'
 BASE_URL = 'http://www.gamekings.nl/category/videos/page/%d/'
 
 ####################################################################################################
@@ -9,7 +11,7 @@ def Start():
   HTTP.Headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'
 
 ####################################################################################################
-@handler('/video/gamekings', NAME)
+@handler('/video/gamekings', NAME, art=ART, thumb=ICON)
 def MainMenu():
 
   return Videos()
