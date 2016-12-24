@@ -31,6 +31,10 @@ def Videos(page=1):
         continue
 
     url = video.xpath('./a/@href')[0]
+
+    if not URLService.ServiceIdentifierForURL(url):
+        continue
+
     summary = video.xpath('./p[@class="post__summary"]/text()')[0].strip()
     thumb = video.xpath('./a/img/@data-original')[0]
 
